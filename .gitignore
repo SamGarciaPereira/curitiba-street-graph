@@ -1,0 +1,31 @@
+# Compilados Java
+*.class
+
+# Saidas de build
+bin/
+build/
+out/
+target/
+
+# Pacotes/artefatos
+*.jar
+*.war
+*.ear
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+nbproject/private/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
