@@ -25,6 +25,13 @@ public class Main {
     private static final String ARESTAS_PADRAO = "arestas.csv";
     private static final String PAJEK_PADRAO = "grafo.net";
 
+    // Centralidades: até quantos vértices mostra tudo, quantos mostra no grafo grande
+    // e a partir de quantos vértices estima o tempo da intermediação antes de calcular
+    private static final int MOSTRAR_TODOS = 20;
+    private static final int TOP_CENTRALIDADE = 10;
+    private static final int LIMITE_ESTIMATIVA = 2000;
+    private static final int AMOSTRA_ESTIMATIVA = 200;
+
     private static final Scanner entrada = new Scanner(System.in);
     private static Grafo grafo = null;
 
@@ -43,8 +50,8 @@ public class Main {
                     case "7" -> mostrarComponentes();
                     case "8" -> verificarEuleriano();
                     case "9" -> verificarCiclico();
-                    case "10" -> naoImplementado("Centralidade de proximidade");
-                    case "11" -> naoImplementado("Centralidade de intermediação");
+                    case "10" -> calcularProximidade();
+                    case "11" -> calcularIntermediacao();
                     case "0" -> {
                         System.out.println("Saindo.");
                         return;
@@ -201,6 +208,70 @@ public class Main {
         boolean ciclico = Estrutura.ehCiclico(grafo);
         long tempo = System.currentTimeMillis() - ini;
         System.out.printf("Cíclico: %s (%d ms)%n", ciclico ? "SIM" : "NÃO", tempo);
+    }
+
+    private static void calcularProximidade() throws IOException {
+        if (!temGrafo()) {
+            return;
+        }
+        long ini = System.currentTimeMillis();
+        double[] proximidade = Centralidade.proximidade(grafo);
+        long tempo = System.currentTimeMillis() - ini;
+
+        System.out.printf("Centralidade de proximidade calculada para %d vértices (%d ms).%n",
+                grafo.getNumVertices(), tempo);
+        mostrarCentralidade(proximidade, null, "proximidade", "proximidade.csv");
+    }
+
+    private static void calcularIntermediacao() throws IOException {
+        if (!temGrafo()) {
+            return;
+        }
+        // Em grafos grandes, mede uma amostra de origens e extrapola antes de rodar o cálculo completo
+        if (grafo.getNumVertices() > LIMITE_ESTIMATIVA) {
+            long estimado = Centralidade.estimarTempoIntermediacao(grafo, AMOSTRA_ESTIMATIVA);
+            System.out.printf("Tempo estimado (amostra de %d origens): %.1f s%n",
+                    AMOSTRA_ESTIMATIVA, estimado / 1000.0);
+            if (!lerSimNao("Continuar? (s/n)")) {
+                return;
+            }
+        }
+        long ini = System.currentTimeMillis();
+        double[] bruto = Centralidade.intermediacao(grafo);
+        long tempo = System.currentTimeMillis() - ini;
+        double[] normalizado = Centralidade.normalizarIntermediacao(grafo, bruto);
+
+        System.out.printf("Centralidade de intermediação calculada para %d vértices (%d ms).%n",
+                grafo.getNumVertices(), tempo);
+        mostrarCentralidade(normalizado, bruto, "intermediacao", "intermediacao.csv");
+    }
+
+    // Mostra todos os vértices em grafos pequenos ou só os maiores valores em grafos grandes,
+    // e oferece gravar os valores de todos os vértices em CSV.
+    // 'bruto' é opcional: quando informado, também mostra o valor sem normalizar.
+    private static void mostrarCentralidade(double[] valores, double[] bruto, String nome, String arquivoPadrao)
+            throws IOException {
+        int n = valores.length;
+        int quantidade = n <= MOSTRAR_TODOS ? n : TOP_CENTRALIDADE;
+        int[] top = Centralidade.maiores(valores, quantidade);
+
+        System.out.println(n <= MOSTRAR_TODOS ? "Valores (do maior para o menor):"
+                : "Os " + quantidade + " vértices com maior " + nome + ":");
+        for (int i = 0; i < top.length; i++) {
+            int v = top[i];
+            if (bruto == null) {
+                System.out.printf("  %2d. Vértice %d (\"%s\"): %.6g%n", i + 1, v + 1, grafo.getRotulo(v), valores[v]);
+            } else {
+                System.out.printf("  %2d. Vértice %d (\"%s\"): %.6g (bruto: %.1f)%n",
+                        i + 1, v + 1, grafo.getRotulo(v), valores[v], bruto[v]);
+            }
+        }
+
+        if (lerSimNao("Gravar os valores de todos os vértices em CSV? (s/n)")) {
+            String caminho = lerTexto("Arquivo de saída", arquivoPadrao);
+            Centralidade.salvarCSV(grafo, bruto == null ? valores : bruto, nome, caminho);
+            System.out.println("Valores gravados em " + caminho);
+        }
     }
 
     private static void naoImplementado(String funcao) {
