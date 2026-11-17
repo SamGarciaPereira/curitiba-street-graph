@@ -8,6 +8,17 @@ import java.util.Scanner;
  * "naoImplementado(...)" pela chamada da função correspondente, usando o
  * grafo carregado em 'grafo'.
  */
+import java.io.IOException;
+import java.util.List;
+import java.util.Scanner;
+
+/**
+ * Menu principal da aplicação.
+ *
+ * As opções 6 a 11 são das outras pessoas da equipe: basta trocar o
+ * "naoImplementado(...)" pela chamada da função correspondente, usando o
+ * grafo carregado em 'grafo'.
+ */
 public class Main {
 
     private static final String NOS_PADRAO = "nos.csv";
@@ -28,10 +39,10 @@ public class Main {
                     case "3" -> salvarPajek();
                     case "4" -> gerarAleatorio();
                     case "5" -> mostrarResumo();
-                    case "6" -> naoImplementado("Verificar se o grafo é conexo");
-                    case "7" -> naoImplementado("Mostrar componentes (fracamente conectados)");
-                    case "8" -> naoImplementado("Verificar se o grafo é Euleriano");
-                    case "9" -> naoImplementado("Verificar se o grafo é cíclico");
+                    case "6" -> verificarConexo();
+                    case "7" -> mostrarComponentes();
+                    case "8" -> verificarEuleriano();
+                    case "9" -> verificarCiclico();
                     case "10" -> naoImplementado("Centralidade de proximidade");
                     case "11" -> naoImplementado("Centralidade de intermediação");
                     case "0" -> {
@@ -111,6 +122,85 @@ public class Main {
         if (temGrafo()) {
             System.out.println(grafo.resumo());
         }
+    }
+
+    private static void verificarConexo() {
+        if (!temGrafo()) {
+            return;
+        }
+        long ini = System.currentTimeMillis();
+        boolean conexo = Estrutura.ehConexo(grafo);
+        long tempo = System.currentTimeMillis() - ini;
+        String tipo = grafo.isDirecionado() ? " (fracamente conexo)" : "";
+        System.out.printf("Conexo%s: %s (%d ms)%n", tipo, conexo ? "SIM" : "NÃO", tempo);
+    }
+
+    private static void mostrarComponentes() {
+        if (!temGrafo()) {
+            return;
+        }
+        long ini = System.currentTimeMillis();
+        List<List<Integer>> comps = Estrutura.componentes(grafo);
+        long tempo = System.currentTimeMillis() - ini;
+
+        if (comps.size() <= 1) {
+            System.out.printf("O grafo é conexo: possui apenas 1 componente com %d vértices (%d ms).%n",
+                    grafo.getNumVertices(), tempo);
+            return;
+        }
+
+        System.out.printf("O grafo é desconexo: %d componentes encontrados (%d ms).%n", comps.size(), tempo);
+        for (int i = 0; i < comps.size(); i++) {
+            List<Integer> c = comps.get(i);
+            System.out.printf("  Componente %2d: %d vértices -> ", i + 1, c.size());
+            // Mostra até os 10 primeiros vértices de cada componente para não poluir a tela em grafos gigantes
+            int limite = Math.min(c.size(), 10);
+            StringBuilder sb = new StringBuilder("[");
+            for (int j = 0; j < limite; j++) {
+                if (j > 0) {
+                    sb.append(", ");
+                }
+                int v = c.get(j);
+                sb.append(v + 1).append(" (\"").append(grafo.getRotulo(v)).append("\")");
+            }
+            if (c.size() > limite) {
+                sb.append(", ...");
+            }
+            sb.append("]");
+            System.out.println(sb);
+        }
+    }
+
+    private static void verificarEuleriano() {
+        if (!temGrafo()) {
+            return;
+        }
+        long ini = System.currentTimeMillis();
+        boolean euleriano = Estrutura.ehEuleriano(grafo);
+        int desbalanceados = Estrutura.contarVerticesDesbalanceadosEuler(grafo);
+        long tempo = System.currentTimeMillis() - ini;
+
+        System.out.printf("Euleriano: %s (%d ms)%n", euleriano ? "SIM" : "NÃO", tempo);
+        if (!euleriano) {
+            if (desbalanceados > 0) {
+                String motivo = grafo.isDirecionado()
+                        ? "vértices com grau de entrada diferente do grau de saída"
+                        : "vértices com grau ímpar";
+                System.out.printf("Motivo: %d %s.%n", desbalanceados, motivo);
+            } else {
+                System.out.println("Motivo: os vértices com arestas estão divididos em componentes separados.");
+            }
+        }
+    }
+
+    private static void verificarCiclico() {
+        if (!temGrafo()) {
+            return;
+        }
+        long ini = System.currentTimeMillis();
+        boolean ciclico = Estrutura.ehCiclico(grafo);
+        long tempo = System.currentTimeMillis() - ini;
+        System.out.printf("Cíclico: %s (%d ms)%n", ciclico ? "SIM" : "NÃO", tempo);
     }
 
     private static void naoImplementado(String funcao) {
