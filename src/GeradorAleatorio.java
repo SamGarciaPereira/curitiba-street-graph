@@ -2,27 +2,12 @@ import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
 
-/**
- * Gerador de grafos aleatórios simples (sem laços e sem arestas paralelas),
- * ponderados (peso inteiro de 1 a 100) e rotulados ("e1", "e2", ...).
- *
- * Entradas: número de nós, número de arestas e se o grafo deve ser conexo ou não.
- * - Conexo: primeiro sorteia uma árvore geradora aleatória (n-1 arestas) e depois
- *   completa com arestas aleatórias. Para grafo direcionado, a árvore garante
- *   conexidade fraca.
- * - Desconexo: divide os vértices em dois grupos e só cria arestas dentro de cada grupo,
- *   garantindo pelo menos dois componentes.
- */
-
-// Recebe um número de nós, número de arestas e se o grafo deve ser conexo ou não e devolve um grafo aleatório.
-// O grafo é gerado sem laõs e sem arestas repetidas.
-// Cada aresta recebe um peso aleatório de 1 a 100 e um rótulo "e1", "e2" ...
-// Conexo : primeiro monta uma árvore que passa por todos os vértices, o que jpa garante que tudo está ligado, depois sorteia
-// arestas extras até completar o total.
-// Desconexo : divide os vértices em 2 grupos e só sorteia as arestas dentro de cada grupo. Como não existe nenhuma aresta
-// entre os grupos, o grafo fica com pelo menos 2 pedaõs
-
-
+// gerador de grafo aleatório simples (sem laços e sem arestas paralelas),
+// ponderado (peso inteiro de 1 a 100) e rotulado ("e1", "e2", ...).
+// entradas: nº de nós, nº de arestas e se deve ser conexo ou não.
+// - conexo: monta uma árvore geradora (n-1 arestas, liga todo mundo) e completa com arestas extras;
+//   no grafo direcionado a árvore garante conexidade fraca.
+// - desconexo: divide os vértices em 2 grupos e só cria arestas dentro de cada grupo (>= 2 componentes).
 public final class GeradorAleatorio {
 
     private static final int PESO_MAXIMO = 100;
@@ -30,17 +15,17 @@ public final class GeradorAleatorio {
     private GeradorAleatorio() {
     }
 
-    // Direcionado
+    // atalho: não direcionado, semente aleatória
     public static Grafo gerar(int numNos, int numArestas, boolean conexo) {
         return gerar(numNos, numArestas, conexo, false, new Random());
     }
 
-    // Escolhe
+    // atalho: escolhe se é direcionado, semente aleatória
     public static Grafo gerar(int numNos, int numArestas, boolean conexo, boolean direcionado) {
         return gerar(numNos, numArestas, conexo, direcionado, new Random());
     }
 
-    // A que realmente faz o trabalho , as duas primeiras só chamam essa terceira.
+    // versão principal; as outras duas só chamam esta com uma semente nova
     public static Grafo gerar(int numNos, int numArestas, boolean conexo, boolean direcionado, Random rnd) {
         if (numNos < 1) {
             throw new IllegalArgumentException("O número de nós deve ser pelo menos 1.");
@@ -48,13 +33,13 @@ public final class GeradorAleatorio {
         if (numArestas < 0) {
             throw new IllegalArgumentException("O número de arestas não pode ser negativo.");
         }
-        // maxarestas é a fórmula do grafo completo, o número máximo de arestas que cabe sem repetir
+        // maxArestas = nº máximo de arestas sem repetir (grafo completo)
         if (numArestas > maxArestas(numNos, direcionado)) {
             throw new IllegalArgumentException("Com " + numNos + " nós cabem no máximo "
                     + maxArestas(numNos, direcionado) + " arestas (grafo simples).");
         }
 
-        // grafo com todos os vértices sem nenhuma aresta
+        // grafo com todos os vértices e nenhuma aresta
         Grafo g = new Grafo(numNos, direcionado);
         // conjunto de arestas que já existem (não deixa repetir)
         Set<Long> usadas = new HashSet<>();
@@ -65,10 +50,9 @@ public final class GeradorAleatorio {
                 throw new IllegalArgumentException("Um grafo conexo com " + numNos
                         + " nós precisa de pelo menos " + (numNos - 1) + " arestas.");
             }
-            // Cria um vetor com todos os vértices numa ordem aleatória
+            // vértices numa ordem aleatória
             int[] ordem = permutacao(numNos, rnd);
-            // Monta a árvore
-            // Vou enviar um print no grupo da execução pra ficar mais fácil de entender
+            // monta a árvore geradora (liga todos os vértices)
             for (int i = 1; i < numNos; i++) {
                 int a = ordem[i];
                 int b = ordem[rnd.nextInt(i)];
@@ -79,24 +63,22 @@ public final class GeradorAleatorio {
                 }
                 inserir(g, a, b, usadas, rnd);
             }
-            // A arvore tem n-1 arestas, o completar vai sorteear o resto até chegar mem numArestas
+            // a árvore tem n-1 arestas; completar sorteia o resto até numArestas
             completar(g, numArestas, usadas, rnd);
 
-            // DESCONEXO
-            // Separar os vertices em 2 times , A e B.
-            // Crirar arestas só dentro do tima A e só dentro do time B, nunca criar de A para B
         } else {
+            // desconexo: separa os vértices em 2 grupos (A e B) e só cria arestas dentro de cada grupo
             if (numNos < 2) {
                 throw new IllegalArgumentException("Um grafo desconexo precisa de pelo menos 2 nós.");
             }
 
-            // Quantos vértices em cada time ?
+            // quantos vértices no grupo A
             int k = escolherCorte(numNos, numArestas, direcionado, rnd);
-            // Capacidade de cada time
+            // capacidade (máx. de arestas) de cada grupo
             long capA = maxArestas(k, direcionado);
             long capB = maxArestas(numNos - k, direcionado);
 
-            // Divide as arestas proporcionalmente à capacidade de cada grupo.
+            // divide as arestas proporcionalmente à capacidade de cada grupo
             long noA = Math.round((double) numArestas * capA / (capA + capB));
             noA = Math.min(noA, capA);
             long noB = numArestas - noA;
@@ -105,9 +87,8 @@ public final class GeradorAleatorio {
                 noB = capB;
             }
 
-            // Quais vértices vão para qual time ?
+            // embaralha e divide os vértices: grupo A = posições [0, k); grupo B = posições [k, numNos)
             int[] ordem = permutacao(numNos, rnd);
-            // Crie 3 arestas aleatórias usando só os vértices das posições 0 a 2 da ordem” = time A
             completarGrupo(g, (int) noA, ordem, 0, k, usadas, rnd);
             completarGrupo(g, (int) noB, ordem, k, numNos, usadas, rnd);
         }
@@ -119,16 +100,17 @@ public final class GeradorAleatorio {
         return direcionado ? pares : pares / 2;
     }
 
-    // auxiliares
-    // Ele que vai decidir quantos vértices vão para o A , o resto vai para o B
+    // ---- auxiliares
+
+    // decide quantos vértices vão para o grupo A (o resto vai para B)
     private static int escolherCorte(int n, int m, boolean direcionado, Random rnd) {
-        // Sorteia um tamanho
+        // sorteia um tamanho inicial
         int k = 1 + rnd.nextInt(n / 2);
-        // Se as arestas não couberem , dimunuir o K
+        // se as arestas não couberem nos 2 grupos, diminui k
         while (k > 1 && maxArestas(k, direcionado) + maxArestas(n - k, direcionado) < m) {
             k--;
         }
-        // Serve para descobrir o por que o while parou
+        // se nem no melhor corte couber, é mais arestas do que um grafo desconexo comporta
         if (maxArestas(k, direcionado) + maxArestas(n - k, direcionado) < m) {
             throw new IllegalArgumentException("Com " + n + " nós, um grafo desconexo comporta no máximo "
                     + (maxArestas(1, direcionado) + maxArestas(n - 1, direcionado)) + " arestas.");
@@ -136,7 +118,7 @@ public final class GeradorAleatorio {
         return k;
     }
 
-    // Conexo, cria uma lista com todos os vértices
+    // conexo: completa usando todos os vértices
     private static void completar(Grafo g, int alvo, Set<Long> usadas, Random rnd) {
         int[] ids = new int[g.getNumVertices()];
         for (int i = 0; i < ids.length; i++) {
@@ -145,67 +127,62 @@ public final class GeradorAleatorio {
         adicionarAleatorias(g, alvo - g.getNumArestas(), ids, usadas, rnd);
     }
 
-    // Desconexo, recebe a aordem embaralhada e o pedaço que ainda interessa (ini até fim)
+    // desconexo: completa usando só o pedaço [ini, fim) da ordem embaralhada
     private static void completarGrupo(Grafo g, int quantidade, int[] ordem, int ini, int fim,
                                        Set<Long> usadas, Random rnd) {
         int[] ids = new int[fim - ini];
-        // Copia só o pedaõ do time para uma lista nova
+        // copia só o pedaço do grupo para uma lista nova
         System.arraycopy(ordem, ini, ids, 0, ids.length);
         adicionarAleatorias(g, quantidade, ids, usadas, rnd);
     }
 
-    // Cria a quantidade de arestas novas usando só os svértices da lista ids
+    // cria "quantidade" arestas novas usando só os vértices da lista ids
     private static void adicionarAleatorias(Grafo g, int quantidade, int[] ids, Set<Long> usadas, Random rnd) {
         if (quantidade <= 0) {
             return;
         }
-        // Mede o quanto o grupo ta cheio
         int k = ids.length;
         boolean dir = g.isDirecionado();
         long capacidade = maxArestas(k, dir);
+        // conta quantas arestas o grupo já tem
         long jaUsadas = 0;
-        // Conta quantas arestas o grupo já tem
         for (int a : ids) {
             jaUsadas += g.getGrauSaida(a);
         }
         if (!dir) {
             jaUsadas /= 2;
         }
-        // O grupo vai ficar mais da metade cheio ?
+        // grupo vai passar da metade da capacidade?
         if (jaUsadas + quantidade > capacidade / 2) {
-            // Modo denso: lista todos os pares livres, embaralha e pega os primeiros.
-            long livres = capacidade - jaUsadas;
-            long[] pares = new long[(int) livres];
+            // modo denso (grupo quase cheio): lista todos os pares de vértices ainda livres e
+            // sorteia entre eles sem repetir. cada par livre fica em dois vetores paralelos:
+            // pontaA[p] e pontaB[p] são as duas pontas da aresta candidata p.
+            int livres = (int) (capacidade - jaUsadas);
+            int[] pontaA = new int[livres];
+            int[] pontaB = new int[livres];
             int p = 0;
-            // Anota todos os pares livres
-            // Os 2 for passam por todos os pares de vértices do grupo
             for (int i = 0; i < k; i++) {
+                // não direcionado: só j > i (cada par aparece uma vez); direcionado: todo j != i
                 for (int j = dir ? 0 : i + 1; j < k; j++) {
                     if (i == j) {
                         continue;
                     }
                     if (!usadas.contains(chave(ids[i], ids[j], dir, g.getNumVertices()))) {
-                        // Aqui junta os bits em um long
-                        pares[p++] = ((long) ids[i] << 32) | ids[j];
+                        pontaA[p] = ids[i];
+                        pontaB[p] = ids[j];
+                        p++;
                     }
                 }
             }
-            // Sorteia entre os livres, sem repretir
+            // embaralhamento parcial: troca o par i por um sorteado à frente e usa o primeiro
             for (int i = 0; i < quantidade; i++) {
                 int r = i + rnd.nextInt(p - i);
-                long t = pares[i];
-                pares[i] = pares[r];
-                pares[r] = t;
-                // Isso aqui ele ta desempacotando o par 32 bits de cima = a 32 bits de baixo = b
-                // pares[i] >>> 32) emuprra tudo 32 casas para a direita, a metade da baixo 'b' cai pra fora e some, o a desce para o lugar dele
-                // pares[i] & 0xffffffffL o & bit a bit compara casa por casa e só mantém o bit onde os dois números tem 1
-                // 0xffffffffl é um número com 32 zeros em cima e 32 uns em baixo
-                // Onde a máscara tem 0, o resultado vira 0 e o a é apagado
-                // Onde a máscara tem 1, o resultado vira 1 e o b sobrevive
-                inserir(g, (int) (pares[i] >>> 32), (int) (pares[i] & 0xffffffffL), usadas, rnd);
+                int ta = pontaA[i]; pontaA[i] = pontaA[r]; pontaA[r] = ta;
+                int tb = pontaB[i]; pontaB[i] = pontaB[r]; pontaB[r] = tb;
+                inserir(g, pontaA[i], pontaB[i], usadas, rnd);
             }
         } else {
-            // Modo normal, sorteia 2 vértices da lista, o rnd sorteia uma posição e o ids[...] pega o vértice dessa posição
+            // modo rejeição (grupo com espaço): sorteia 2 vértices e tenta inserir; se já existe, sorteia de novo
             int adicionadas = 0;
             while (adicionadas < quantidade) {
                 int a = ids[rnd.nextInt(k)];
@@ -226,9 +203,8 @@ public final class GeradorAleatorio {
         return true;
     }
 
-    // O conjunto usadas precisa guardar as arestas que já existem.
-    // Guardar um número por aresta é mais simples e rápido que guardar um par.
-    // Como se fosse a chave o HashMap
+    // transforma o par (a, b) num único número para guardar no conjunto "usadas"
+    // (não direcionado: ordena a,b para (1,2) e (2,1) virarem a mesma chave)
     private static long chave(int a, int b, boolean direcionado, int n) {
         if (!direcionado && a > b) {
             int t = a;
@@ -238,6 +214,7 @@ public final class GeradorAleatorio {
         return (long) a * n + b;
     }
 
+    // Fisher-Yates: devolve 0..n-1 numa ordem aleatória
     private static int[] permutacao(int n, Random rnd) {
         int[] v = new int[n];
         for (int i = 0; i < n; i++) {

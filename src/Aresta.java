@@ -1,3 +1,4 @@
+// aresta da lista de adjacência: guarda destino, peso e rótulo (a origem é quem tem a lista)
 public class Aresta {
     private final int destino;
     private final double peso;

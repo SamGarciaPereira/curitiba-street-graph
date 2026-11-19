@@ -5,7 +5,7 @@ import java.util.List;
 public class Grafo {
     private final boolean direcionado;
     private final List<String> rotulos = new ArrayList<>();
-    // Lista de listas,  adjacencia.get(i) é a lista de arestas que saem do vértice i
+    // lista de adjacência: adjacencia.get(i) são as arestas que saem do vértice i
     private final List<List<Aresta>> adjacencia = new ArrayList<>();
     private int numArestas = 0;
 
@@ -13,7 +13,7 @@ public class Grafo {
         this.direcionado = direcionado;
     }
 
-    // Cria um Grafo já rotulado e com o número de arestas
+    // cria um grafo com n vértices já rotulados "1".."n"
     public Grafo(int n, boolean direcionado) {
         this(direcionado);
         for (int i = 0; i < n; i++) {
@@ -21,15 +21,15 @@ public class Grafo {
         }
     }
 
-    // Adiciona um vértice e devolve o seu índice
+    // adiciona um vértice e devolve o seu índice
     public int adicionarVertice(String rotulo) {
         rotulos.add(rotulo);
         adjacencia.add(new ArrayList<>());
         return rotulos.size() - 1;
     }
 
-    // Valida os vértices, adiciona na lista de origem. Caso seja não direcionado, também vai colocar
-    // na lista de destino uma aresta que aponta de volta para a origem. Só adiciona +1 no numArestas.
+    // adiciona a aresta na lista da origem; se não direcionado, adiciona também a volta
+    // (destino->origem). conta só +1 em numArestas (uma aresta lógica)
     public void adicionarAresta(int origem, int destino, double peso, String rotulo) {
         validarVertice(origem);
         validarVertice(destino);
@@ -40,7 +40,7 @@ public class Grafo {
         numArestas++;
     }
 
-    // Percorre a lista da origem procurando alguma aresta com aquele destino.
+    // procura na lista da origem uma aresta para aquele destino
     public boolean existeAresta(int origem, int destino) {
         validarVertice(origem);
         validarVertice(destino);
@@ -71,18 +71,17 @@ public class Grafo {
 
     public List<Aresta> getAdjacentes(int vertice) {
         validarVertice(vertice);
-        // Esse unmodifiableList não permite dar add / remove
+        // unmodifiableList: impede add/remove de fora
         return Collections.unmodifiableList(adjacencia.get(vertice));
     }
 
-    // Tamanho da lista de v , no grafo não direcionado , isso já é o seu  grau
+    // tamanho da lista de v; no grafo não direcionado isso já é o grau
     public int getGrauSaida(int vertice) {
         validarVertice(vertice);
         return adjacencia.get(vertice).size();
     }
 
-    // Percorre todas as arestas do grafo e contam quantas vezes chegam em cada vértice.
-    // Retorna um vetor com essa contagem.
+    // conta quantas arestas chegam em cada vértice (grau de entrada)
     public int[] getGrausEntrada() {
         int[] graus = new int[getNumVertices()];
         for (List<Aresta> lista : adjacencia) {
@@ -99,7 +98,7 @@ public class Grafo {
         }
     }
 
-    // Resumo completo do grafo criado
+    // resumo do grafo: tipo, nº de vértices/arestas, grau médio/máximo e isolados
     public String resumo() {
         int n = getNumVertices();
         int maxGrau = 0;

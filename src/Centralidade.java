@@ -10,46 +10,42 @@ import java.util.Locale;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * Funções de centralidade do grafo (distância do melhor caminho, calculada com Dijkstra):
- * - Centralidade de proximidade (closeness) de cada nó
- * - Centralidade de intermediação (betweenness) de cada nó
- * - Estimativa de tempo da intermediação (mede uma amostra de origens e extrapola)
- */
+// funções de centralidade (distância do melhor caminho, calculada com Dijkstra):
+// - centralidade de proximidade (closeness) de cada nó
+// - centralidade de intermediação (betweenness) de cada nó
+// - estimativa de tempo da intermediação (mede uma amostra de origens e extrapola)
 
-// O peso da aresta é a distância (no grafo de Curitiba, o comprimento do trecho em metros).
-// Como o Dijkstra exige pesos não negativos, um peso negativo gera erro.
+// o peso da aresta é a distância (no grafo de Curitiba, o comprimento do trecho em metros).
+// como o Dijkstra exige pesos não negativos, um peso negativo gera erro.
 //
-// Otimizações para o grafo de Curitiba (36.107 vértices e 51.699 trechos):
-// 1) Antes das buscas, a lista de adjacência é copiada para vetores (int[] / double[]) no formato
+// otimizações para o grafo de Curitiba (36.107 vértices e 51.699 trechos):
+// 1) antes das buscas, a lista de adjacência é copiada para vetores (int[] / double[]) no formato
 //    "lista compacta": as arestas que saem de u ficam nas posições inicio[u] até inicio[u+1]-1.
-//    Assim o Dijkstra não cria objetos nem usa List<Integer> (sem boxing), o que deixa a busca bem mais rápida.
-// 2) A fila de prioridade do Dijkstra é um heap binário de vértices com "diminuir chave"
+//    assim o Dijkstra não cria objetos nem usa List<Integer> (sem boxing), deixando a busca bem mais rápida.
+// 2) a fila de prioridade do Dijkstra é um heap binário de vértices com "diminuir chave"
 //    (cada vértice entra no heap uma única vez), feito em vetor.
-// 3) Cada origem é independente das outras, então as n buscas são divididas entre as threads do processador.
-//    Cada thread tem seus próprios vetores e, no fim, as somas parciais são juntadas.
+// 3) cada origem é independente, então as n buscas são divididas entre as threads do processador;
+//    cada thread tem seus próprios vetores e, no fim, as somas parciais são juntadas.
 //
-// Complexidade (n = vértices, m = arestas):
-// - Um Dijkstra com heap binário: O((n + m) log n).
-// - Proximidade: um Dijkstra por vértice -> O(n (n + m) log n) de tempo e O(n + m) de memória.
-// - Intermediação (algoritmo de Brandes): um Dijkstra por vértice + uma passada de acumulação O(n + m)
+// complexidade (n = vértices, m = arestas):
+// - um Dijkstra com heap binário: O((n + m) log n).
+// - proximidade: um Dijkstra por vértice -> O(n (n + m) log n) de tempo e O(n + m) de memória.
+// - intermediação (algoritmo de Brandes): um Dijkstra por vértice + uma passada de acumulação O(n + m)
 //   -> O(n (n + m) log n) de tempo e O(n + m) de memória por thread.
-// - Com t threads, o tempo de parede cai para aproximadamente O(n (n + m) log n / t).
-
+// - com t threads, o tempo de parede cai para aproximadamente O(n (n + m) log n / t).
 public final class Centralidade {
 
     private Centralidade() {
     }
 
-    // ------------------------------------------------------------------ 10. Proximidade
+    // ---- 10. proximidade
 
-    // Centralidade de proximidade de cada vértice v, usando a distância do menor caminho que SAI de v.
-    // Fórmula clássica (grafo conexo): C(v) = (n - 1) / soma das distâncias de v até os outros vértices.
-    // Como o grafo de Curitiba não é conexo (28 componentes), a soma seria infinita. Por isso usamos a
+    // centralidade de proximidade de cada vértice v, pela distância do menor caminho que sai de v.
+    // fórmula clássica (grafo conexo): C(v) = (n - 1) / soma das distâncias de v até os outros.
+    // como o grafo de Curitiba não é conexo (28 componentes), a soma seria infinita; por isso usa a
     // correção de Wasserman e Faust, que considera só os r vértices alcançáveis a partir de v (contando v):
     //     C(v) = ((r - 1) / soma) * ((r - 1) / (n - 1))
-    // Se o grafo for conexo, r = n e a fórmula vira exatamente a clássica.
-    // Vértice que não alcança ninguém fica com 0.
+    // se o grafo for conexo, r = n e volta à fórmula clássica. vértice que não alcança ninguém fica com 0.
     public static double[] proximidade(Grafo g) {
         Rede rede = new Rede(g);
         int n = rede.n;
@@ -78,19 +74,19 @@ public final class Centralidade {
         return resultado;
     }
 
-    // ------------------------------------------------------------------ 11. Intermediação
+    // ---- 11. intermediação
 
-    // Centralidade de intermediação de cada vértice v (algoritmo de Brandes, com Dijkstra):
+    // centralidade de intermediação de cada vértice v (algoritmo de Brandes, com Dijkstra):
     //     B(v) = soma, para todo par s != v != t, de sigma_st(v) / sigma_st
-    // sigma_st = número de menores caminhos de s até t; sigma_st(v) = quantos deles passam por v.
-    // Para cada origem s:
-    //   1) Dijkstra a partir de s, contando sigma[w] (quantos menores caminhos chegam em w) e guardando
+    // sigma_st = nº de menores caminhos de s até t; sigma_st(v) = quantos deles passam por v.
+    // para cada origem s:
+    //   1) Dijkstra a partir de s, contando sigma[w] (menores caminhos que chegam em w) e guardando
     //      a ordem em que os vértices foram finalizados (do mais perto para o mais longe).
-    //   2) Percorre essa ordem de trás para frente acumulando a "dependência" delta[v]:
+    //   2) percorre essa ordem de trás para frente acumulando a "dependência" delta[v]:
     //      delta[v] = soma, para cada w com dist[w] == dist[v] + peso(v, w), de sigma[v] / sigma[w] * (1 + delta[w])
-    //   3) Soma delta[v] em B(v) (exceto a própria origem).
-    // Grafo não direcionado: cada par {s, t} é contado duas vezes (s->t e t->s), por isso divide por 2.
-    // Devolve o valor bruto (sem normalizar). Para o valor entre 0 e 1, use normalizarIntermediacao.
+    //   3) soma delta[v] em B(v) (exceto a própria origem).
+    // não direcionado: cada par {s, t} é contado duas vezes (s->t e t->s), por isso divide por 2.
+    // devolve o valor bruto; para o valor entre 0 e 1, use normalizarIntermediacao.
     public static double[] intermediacao(Grafo g) {
         Rede rede = new Rede(g);
         int[] origens = new int[rede.n];
@@ -100,7 +96,7 @@ public final class Centralidade {
         return intermediacao(g, rede, origens);
     }
 
-    // Faz o Brandes só para as origens informadas (usado também pela estimativa de tempo).
+    // faz o Brandes só para as origens informadas (usado também pela estimativa de tempo)
     private static double[] intermediacao(Grafo g, Rede rede, int[] origens) {
         int n = rede.n;
         List<double[]> parciais = new ArrayList<>();
@@ -115,7 +111,7 @@ public final class Centralidade {
                 int s = origens[i];
                 int alcancados = d.executar(s);
 
-                // Percorre do vértice mais distante para o mais próximo da origem
+                // percorre do vértice mais distante para o mais próximo da origem
                 for (int k = alcancados - 1; k >= 0; k--) {
                     int v = d.ordem[k];
                     double dep = 0;
@@ -132,7 +128,7 @@ public final class Centralidade {
                         parcial[v] += dep;
                     }
                 }
-                // Zera só os vértices usados nesta busca (mais rápido que zerar o vetor todo)
+                // zera só os vértices usados nesta busca (mais rápido que zerar o vetor todo)
                 for (int k = 0; k < alcancados; k++) {
                     delta[d.ordem[k]] = 0;
                 }
@@ -142,7 +138,7 @@ public final class Centralidade {
             }
         });
 
-        // Junta as somas de cada thread
+        // junta as somas de cada thread
         double[] resultado = new double[n];
         for (double[] parcial : parciais) {
             for (int v = 0; v < n; v++) {
@@ -157,7 +153,7 @@ public final class Centralidade {
         return resultado;
     }
 
-    // Normaliza a intermediação para ficar entre 0 e 1, dividindo pelo número de pares (s, t) sem v:
+    // normaliza a intermediação para [0, 1], dividindo pelo nº de pares (s, t) sem v:
     // - direcionado: (n - 1)(n - 2)
     // - não direcionado: (n - 1)(n - 2) / 2
     public static double[] normalizarIntermediacao(Grafo g, double[] bruto) {
@@ -176,11 +172,11 @@ public final class Centralidade {
         return normalizado;
     }
 
-    // ------------------------------------------------------------------ Medição de tempo
+    // ---- medição de tempo
 
-    // Estima o tempo (em ms) da intermediação no grafo inteiro: roda o Brandes para uma amostra de
-    // origens sorteadas e extrapola. Como cada origem custa O((n + m) log n), o tempo total é
-    // proporcional ao número de origens: tempoTotal ≈ tempoAmostra * n / amostra.
+    // estima o tempo (ms) da intermediação no grafo todo: roda o Brandes numa amostra de origens e
+    // extrapola. como cada origem custa O((n + m) log n), o total é proporcional ao nº de origens:
+    // tempoTotal ~ tempoAmostra * n / amostra.
     public static long estimarTempoIntermediacao(Grafo g, int amostra) {
         Rede rede = new Rede(g);
         int n = rede.n;
@@ -189,7 +185,7 @@ public final class Centralidade {
         }
         amostra = Math.max(1, Math.min(amostra, n));
 
-        // Sorteia "amostra" origens diferentes (embaralhamento parcial com semente fixa)
+        // sorteia "amostra" origens diferentes (embaralhamento parcial com semente fixa)
         int[] todos = new int[n];
         for (int i = 0; i < n; i++) {
             todos[i] = i;
@@ -209,9 +205,9 @@ public final class Centralidade {
         return Math.round(tempoAmostra / 1e6 * n / amostra);
     }
 
-    // ------------------------------------------------------------------ Auxiliares de exibição
+    // ---- auxiliares de exibição
 
-    // Devolve os índices dos k vértices com maior valor (do maior para o menor).
+    // devolve os índices dos k vértices com maior valor (do maior para o menor)
     public static int[] maiores(double[] valores, int k) {
         k = Math.min(k, valores.length);
         Integer[] indices = new Integer[valores.length];
@@ -226,7 +222,7 @@ public final class Centralidade {
         return top;
     }
 
-    // Grava o valor de cada vértice em CSV: vertice (numeração do Pajek, começando em 1), rotulo, valor
+    // grava o valor de cada vértice em CSV: vertice (numeração do Pajek, começa em 1), rotulo, valor
     public static void salvarCSV(Grafo g, double[] valores, String nomeColuna, String caminho) throws IOException {
         try (BufferedWriter out = Files.newBufferedWriter(Path.of(caminho), StandardCharsets.UTF_8)) {
             out.write("vertice,rotulo," + nomeColuna);
@@ -239,9 +235,9 @@ public final class Centralidade {
         }
     }
 
-    // ------------------------------------------------------------------ Estruturas internas
+    // ---- estruturas internas
 
-    // Executa a mesma tarefa em uma thread por núcleo do processador e espera todas terminarem.
+    // executa a mesma tarefa numa thread por núcleo e espera todas terminarem
     private static void executarEmParalelo(Runnable tarefa) {
         int numThreads = Math.max(1, Runtime.getRuntime().availableProcessors());
         Thread[] threads = new Thread[numThreads];
@@ -271,9 +267,9 @@ public final class Centralidade {
         }
     }
 
-    // Cópia do grafo em vetores ("lista compacta"): as arestas que saem de u estão em
+    // cópia do grafo em vetores ("lista compacta"): as arestas que saem de u estão em
     // destino[inicio[u] .. inicio[u+1]-1] e peso[inicio[u] .. inicio[u+1]-1].
-    // Laços (u -> u) são ignorados, pois nunca fazem parte de um menor caminho.
+    // laços (u -> u) são ignorados, pois nunca fazem parte de um menor caminho.
     private static final class Rede {
         final int n;
         final int[] inicio;
@@ -313,8 +309,8 @@ public final class Centralidade {
         }
     }
 
-    // Dijkstra com heap binário de vértices. Cada thread cria o seu e reaproveita os vetores a cada origem.
-    // Depois de executar(s):
+    // Dijkstra com heap binário de vértices. cada thread cria o seu e reaproveita os vetores a cada origem.
+    // depois de executar(s):
     // - dist[v]  = menor distância de s até v (infinito se não alcança)
     // - sigma[v] = número de menores caminhos de s até v
     // - ordem[0..alcancados-1] = vértices na ordem em que foram finalizados (distância crescente)
@@ -345,9 +341,9 @@ public final class Centralidade {
             Arrays.fill(posicao, -1);
         }
 
-        // Roda o Dijkstra a partir de s e devolve quantos vértices foram alcançados (incluindo s).
+        // roda o Dijkstra a partir de s e devolve quantos vértices alcançou (incluindo s)
         int executar(int s) {
-            // Limpa só o que a busca anterior usou
+            // limpa só o que a busca anterior usou
             for (int i = 0; i < alcancadosAnterior; i++) {
                 int v = ordem[i];
                 dist[v] = Double.POSITIVE_INFINITY;
@@ -374,7 +370,7 @@ public final class Centralidade {
                     }
                     double alt = dist[v] + rede.peso[e];
                     if (alt < dist[w]) {
-                        // Achou um caminho menor: os caminhos até w passam a ser os que chegam em v
+                        // achou um caminho menor: os caminhos até w passam a ser os que chegam em v
                         dist[w] = alt;
                         sigma[w] = sigma[v];
                         if (posicao[w] == -1) {
@@ -383,7 +379,7 @@ public final class Centralidade {
                             subir(posicao[w]);
                         }
                     } else if (alt == dist[w]) {
-                        // Outro caminho com o mesmo tamanho: soma a quantidade de caminhos
+                        // outro caminho de mesmo tamanho: soma a quantidade de caminhos
                         sigma[w] += sigma[v];
                     }
                 }

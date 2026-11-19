@@ -1,28 +1,18 @@
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Funções de estrutura do grafo:
- * - Verificar se o grafo é conexo
- * - Mostrar componentes (fracamente conectados se direcionado)
- * - Verificar se o grafo é Euleriano
- * - Verificar se o grafo é cíclico
- */
-
-// Reúne os 4 algoritmos da parte de estrutura.
-// Como o grafo de Curitiba tem mais de 36 mil vértices, as buscas usam fila/pilha
-// em vetor (int[]) em vez de recursão, evitando estourar a pilha do Java (StackOverflowError).
-
+// funções de estrutura do grafo: conexo, componentes, Euleriano e cíclico.
+// como o grafo de Curitiba tem mais de 36 mil vértices, as buscas usam fila/pilha em
+// vetor (int[]) em vez de recursão, para não estourar a pilha do Java (StackOverflowError).
 public final class Estrutura {
 
     private Estrutura() {
     }
 
-    // ------------------------------------------------------------------ 6. Conexo
+    // ---- 6. conexo
 
-    // Verifica se o grafo é conexo.
-    // Se for direcionado, considera conexidade fraca (ignora a direção das arestas),
-    // mantendo o mesmo critério usado no GeradorAleatorio e na listagem de componentes.
+    // verifica se o grafo é conexo.
+    // se for direcionado, usa conexidade fraca (ignora a direção), o mesmo critério dos componentes.
     public static boolean ehConexo(Grafo g) {
         if (g.getNumVertices() == 0) {
             return true;
@@ -30,11 +20,10 @@ public final class Estrutura {
         return componentes(g).size() == 1;
     }
 
-    // ------------------------------------------------------------------ 7. Componentes
+    // ---- 7. componentes
 
-    // Devolve uma lista onde cada elemento é uma lista com os vértices daquele componente.
-    // Em grafos direcionados, encontra os componentes fracamente conectados:
-    // para isso, monta uma lista de vizinhos ignorando o sentido da seta (ida e volta).
+    // devolve a lista de componentes (cada um é a lista de vértices daquele pedaço).
+    // no grafo direcionado acha os fracamente conectados: monta os vizinhos ignorando o sentido da seta.
     public static List<List<Integer>> componentes(Grafo g) {
         int n = g.getNumVertices();
         List<List<Integer>> listaComponentes = new ArrayList<>();
@@ -42,8 +31,7 @@ public final class Estrutura {
             return listaComponentes;
         }
 
-        // Se for direcionado, precisamos saber tanto quem sai quanto quem chega no vértice
-        // para caminhar nos dois sentidos (conexidade fraca).
+        // no direcionado precisa dos vizinhos de entrada e de saída para andar nos dois sentidos
         List<List<Integer>> vizinhosSemDirecao = null;
         if (g.isDirecionado()) {
             vizinhosSemDirecao = new ArrayList<>(n);
@@ -62,8 +50,7 @@ public final class Estrutura {
         boolean[] visitado = new boolean[n];
         int[] fila = new int[n];
 
-        // Passa por cada vértice; se ainda não foi visitado, começa uma busca em largura (BFS)
-        // para descobrir todos os vértices que estão no mesmo "pedaço" (componente) que ele.
+        // para cada vértice ainda não visitado, uma BFS marca todo o seu componente
         for (int i = 0; i < n; i++) {
             if (visitado[i]) {
                 continue;
@@ -99,16 +86,16 @@ public final class Estrutura {
             listaComponentes.add(comp);
         }
 
-        // Ordena do maior componente para o menor (deixa a exibição mais limpa no menu)
+        // ordena do maior componente para o menor (exibição mais limpa no menu)
         listaComponentes.sort((a, b) -> Integer.compare(b.size(), a.size()));
         return listaComponentes;
     }
 
-    // ------------------------------------------------------------------ 8. Euleriano
+    // ---- 8. Euleriano
 
-    // Verifica se o grafo possui um ciclo Euleriano (passa por todas as arestas exatamente uma vez e volta ao início).
-    // - Não direcionado: conexo (ignorando vértices isolados) e todos os vértices com grau par.
-    // - Direcionado: fortemente conexo nos vértices com arestas e grauEntrada[v] == grauSaida[v] em todos os vértices.
+    // verifica se o grafo tem ciclo Euleriano (passa por toda aresta uma vez e volta ao início).
+    // - não direcionado: conexo (fora os isolados) e todo vértice com grau par.
+    // - direcionado: grauEntrada == grauSaida em todo vértice e conexo nos vértices com aresta.
     public static boolean ehEuleriano(Grafo g) {
         int n = g.getNumVertices();
         if (n == 0 || g.getNumArestas() == 0) {
@@ -133,13 +120,13 @@ public final class Estrutura {
                     return false;
                 }
             }
-            // 2º critério: se todo vértice tem grauEntrada == grauSaida e os vértices com arestas
-            // estão fracamente conectados, o grafo também é fortemente conexo nesses vértices.
+            // 2º critério: com grauEntrada == grauSaida em todo vértice e os vértices com arestas
+            // fracamente conectados, o grafo também é fortemente conexo nesses vértices.
             return verticesComArestasConectados(g, entrada);
         }
     }
 
-    // Conta quantos vértices impedem o grafo de ser Euleriano (útil para explicar o motivo no menu)
+    // conta quantos vértices impedem o grafo de ser Euleriano (para explicar o motivo no menu)
     public static int contarVerticesDesbalanceadosEuler(Grafo g) {
         int n = g.getNumVertices();
         int[] entrada = g.getGrausEntrada();
@@ -158,7 +145,7 @@ public final class Estrutura {
         return cont;
     }
 
-    // Verifica se todos os vértices que possuem pelo menos 1 aresta pertencem a um único componente
+    // verifica se todos os vértices com pelo menos 1 aresta estão num único componente
     private static boolean verticesComArestasConectados(Grafo g, int[] entrada) {
         List<List<Integer>> comps = componentes(g);
         int compComAresta = 0;
@@ -180,13 +167,13 @@ public final class Estrutura {
         return compComAresta == 1;
     }
 
-    // ------------------------------------------------------------------ 9. Cíclico
+    // ---- 9. cíclico
 
-    // Verifica se o grafo possui pelo menos um ciclo.
-    // - Direcionado: usa o algoritmo de Kahn (ordenação topológica por remoção de graus de entrada 0).
-    //   Se sobrar algum vértice que não pôde ser removido, existe pelo menos um ciclo direcionado.
-    // - Não direcionado: usa busca em profundidade (DFS) guardando o pai de cada vértice.
-    //   Se encontrar um vizinho já visitado que não é o pai (ou uma segunda aresta paralela para o pai), há ciclo.
+    // verifica se o grafo tem pelo menos um ciclo.
+    // - direcionado: algoritmo de Kahn (ordenação topológica removendo quem tem grau de entrada 0);
+    //   se sobrar vértice sem remover, há ciclo.
+    // - não direcionado: DFS guardando o pai; vizinho já visitado que não é o pai (ou 2ª aresta
+    //   para o pai) fecha um ciclo.
     public static boolean ehCiclico(Grafo g) {
         int n = g.getNumVertices();
         if (n == 0 || g.getNumArestas() == 0) {
@@ -200,8 +187,8 @@ public final class Estrutura {
         }
     }
 
-    // Algoritmo de Kahn: coloca na fila quem tem grau de entrada 0 e vai "apagando" as arestas que saem dele.
-    // Grafo acíclico (DAG) consegue visitar todos os n vértices. Se parar antes de n, tem ciclo.
+    // Kahn: enfileira quem tem grau de entrada 0 e vai "apagando" as arestas que saem dele.
+    // um DAG visita todos os n vértices; se parar antes de n, há ciclo.
     private static boolean ehCiclicoDirecionado(Grafo g) {
         int n = g.getNumVertices();
         int[] grauEntrada = g.getGrausEntrada();
@@ -231,14 +218,13 @@ public final class Estrutura {
         return visitados < n;
     }
 
-    // DFS iterativa para grafo não direcionado.
-    // Trata laços (u == v), arestas paralelas (duas ruas diferentes ligando os mesmos 2 nós) e ciclos de 3+ nós.
+    // DFS iterativa (não direcionado); trata laços (u == v), arestas paralelas e ciclos de 3+ nós.
     private static boolean ehCiclicoNaoDirecionado(Grafo g) {
         int n = g.getNumVertices();
         // estado: 0 = não visitado, 1 = na pilha (em processamento), 2 = finalizado
         int[] estado = new int[n];
         int[] pai = new int[n];
-        // guarda em qual índice da lista de adjacência cada vértice parou (simula a recursão sem estourar pilha)
+        // em que índice da adjacência cada vértice parou (simula a recursão sem estourar a pilha)
         int[] indiceVizinho = new int[n];
         boolean[] viuPai = new boolean[n];
         int[] pilha = new int[n];
@@ -264,13 +250,13 @@ public final class Estrutura {
                     int v = adj.get(indiceVizinho[u]).getDestino();
                     indiceVizinho[u]++;
 
-                    // Laço (aresta de u para o próprio u)
+                    // laço (aresta de u para o próprio u)
                     if (v == u) {
                         return true;
                     }
 
-                    // Se v é o pai de u na árvore da busca: a primeira aresta é só a volta da mesma rua,
-                    // mas se aparecer uma segunda aresta para o mesmo pai, são arestas paralelas (ciclo de 2 nós).
+                    // v é o pai de u: a 1ª volta é a mesma aresta; uma 2ª aresta para o pai
+                    // são arestas paralelas (ciclo de 2 nós).
                     if (v == pai[u]) {
                         if (viuPai[u]) {
                             return true;
@@ -284,7 +270,7 @@ public final class Estrutura {
                         estado[v] = 1;
                         pilha[topo++] = v;
                     } else {
-                        // Encontrou um vértice já visitado que não é o pai -> fechou ciclo
+                        // vértice já visitado que não é o pai -> fechou ciclo
                         return true;
                     }
                 } else {

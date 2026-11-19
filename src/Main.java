@@ -1,32 +1,17 @@
 import java.io.IOException;
-import java.util.Scanner;
-
-/**
- * Menu principal da aplicação.
- *
- * As opções 6 a 11 são das outras pessoas da equipe: basta trocar o
- * "naoImplementado(...)" pela chamada da função correspondente, usando o
- * grafo carregado em 'grafo'.
- */
-import java.io.IOException;
 import java.util.List;
 import java.util.Scanner;
 
-/**
- * Menu principal da aplicação.
- *
- * As opções 6 a 11 são das outras pessoas da equipe: basta trocar o
- * "naoImplementado(...)" pela chamada da função correspondente, usando o
- * grafo carregado em 'grafo'.
- */
+// menu principal: carrega/gera o grafo e chama as verificações de estrutura
+// (conexo, componentes, Euleriano, cíclico) e as centralidades
 public class Main {
 
     private static final String NOS_PADRAO = "nos.csv";
     private static final String ARESTAS_PADRAO = "arestas.csv";
     private static final String PAJEK_PADRAO = "grafo.net";
 
-    // Centralidades: até quantos vértices mostra tudo, quantos mostra no grafo grande
-    // e a partir de quantos vértices estima o tempo da intermediação antes de calcular
+    // centralidades: até quantos vértices mostra tudo, quantos mostra no grafo grande
+    // e a partir de quantos estima o tempo da intermediação antes de calcular
     private static final int MOSTRAR_TODOS = 20;
     private static final int TOP_CENTRALIDADE = 10;
     private static final int LIMITE_ESTIMATIVA = 2000;
@@ -87,7 +72,7 @@ public class Main {
         System.out.print("Opção: ");
     }
 
-    // ------------------------------------------------------------------ opções
+    // ---- opções
 
     private static void carregarCSV() throws IOException {
         String nos = lerTexto("Arquivo de nós", NOS_PADRAO);
@@ -160,7 +145,7 @@ public class Main {
         for (int i = 0; i < comps.size(); i++) {
             List<Integer> c = comps.get(i);
             System.out.printf("  Componente %2d: %d vértices -> ", i + 1, c.size());
-            // Mostra até os 10 primeiros vértices de cada componente para não poluir a tela em grafos gigantes
+            // mostra só os 10 primeiros vértices de cada componente (não poluir a tela em grafos grandes)
             int limite = Math.min(c.size(), 10);
             StringBuilder sb = new StringBuilder("[");
             for (int j = 0; j < limite; j++) {
@@ -227,7 +212,7 @@ public class Main {
         if (!temGrafo()) {
             return;
         }
-        // Em grafos grandes, mede uma amostra de origens e extrapola antes de rodar o cálculo completo
+        // em grafos grandes, estima o tempo por uma amostra de origens antes de rodar tudo
         if (grafo.getNumVertices() > LIMITE_ESTIMATIVA) {
             long estimado = Centralidade.estimarTempoIntermediacao(grafo, AMOSTRA_ESTIMATIVA);
             System.out.printf("Tempo estimado (amostra de %d origens): %.1f s%n",
@@ -246,9 +231,8 @@ public class Main {
         mostrarCentralidade(normalizado, bruto, "intermediacao", "intermediacao.csv");
     }
 
-    // Mostra todos os vértices em grafos pequenos ou só os maiores valores em grafos grandes,
-    // e oferece gravar os valores de todos os vértices em CSV.
-    // 'bruto' é opcional: quando informado, também mostra o valor sem normalizar.
+    // mostra todos os vértices (grafo pequeno) ou só os maiores (grafo grande) e oferece gravar em CSV.
+    // bruto é opcional: quando vem, mostra também o valor sem normalizar.
     private static void mostrarCentralidade(double[] valores, double[] bruto, String nome, String arquivoPadrao)
             throws IOException {
         int n = valores.length;
@@ -274,13 +258,7 @@ public class Main {
         }
     }
 
-    private static void naoImplementado(String funcao) {
-        if (temGrafo()) {
-            System.out.println(funcao + ": ainda não implementado.");
-        }
-    }
-
-    // ------------------------------------------------------------------ leitura do teclado
+    // ---- leitura do teclado
 
     private static boolean temGrafo() {
         if (grafo == null) {
